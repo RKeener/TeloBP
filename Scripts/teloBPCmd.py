@@ -32,28 +32,13 @@ errorReturns = {"init": -1, "fusedRead": -10,"strandType": -20, "seqNotFound": -
 teloNP = False
 pdf = PdfPages('teloGraphs.pdf')
 showGraphsGlobal = False
-outputColName = "teloBPLengths"
+outputColNames = ["telomereLength", "isGStrand"]
 
 verbose = False
 
 def vprint(*args, **kwargs):
     if verbose:
         print(*args, **kwargs)
-
-# def rowToTeloBP(row, teloNP):
-#     import numpy as np
-#     from TeloBP import getTeloNPBoundary, getTeloBoundary
-#     # This if statement is to catch any rows which have NaN in the seq column. 
-#     # Ideally this should not be necessary, but it is here just in case.
-#     if row["seq"] is np.nan:
-#         return errorReturns["seqNotFound"]
-    
-#     teloLength = -1
-#     if teloNP:
-#         teloLength = getTeloNPBoundary(row["seq"])
-#     else:
-#         teloLength = getTeloBoundary(row["seq"])
-#     return teloLength
 
 def rowToTeloBP(row, sampleKey, showGraphsGlobal):
     import sys
@@ -93,8 +78,8 @@ def rowToTeloNP(row, sampleKey, showGraphsGlobal):
         plt.axis('off')
         pdf.savefig()  # Save the text figure
         pdfLocal = pdf
-    teloLength = getTeloNPBoundary(row["seq"],showGraphs = showGraphsGlobal, pdf = pdfLocal)
-    return teloLength
+    teloLength, isGStrand = getTeloNPBoundary(row["seq"],showGraphs=showGraphsGlobal, pdf=pdfLocal)
+    return teloLength, isGStrand
 
 def process_sampleDf(sampleQnames, sampleKey, outputDir):
     sampleDf = sampleQnames[sampleKey]
@@ -109,44 +94,48 @@ def process_sampleDf(sampleQnames, sampleKey, outputDir):
         pandarallel.initialize(progress_bar=True)
     if teloNP:
         if showGraphsGlobal:
-            sampleDf[outputColName] = sampleDf.apply(rowToTeloNP,axis=1, args=(sampleKey, showGraphsGlobal))
+            sampleDf['res'] = sampleDf.apply(rowToTeloNP, axis=1, args=(sampleKey, showGraphsGlobal))
         else:
-            sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloNP,axis=1, args=(sampleKey, showGraphsGlobal))
+            sampleDf['res'] = sampleDf.parallel_apply(rowToTeloNP, axis=1, args=(sampleKey, showGraphsGlobal))
     else:
-        sampleDf[outputColName] = sampleDf.parallel_apply(rowToTeloBP,axis=1, args=(sampleKey, showGraphsGlobal))
+        sampleDf['res'] = sampleDf.parallel_apply(rowToTeloBP,axis=1, args=(sampleKey, showGraphsGlobal))
 
     vprint(f"inputLen: {inputLen}")
     vprint(f"outputLen: {len(sampleDf)}")
     if inputLen != len(sampleDf):
         print(f"Error: starting length of {inputLen} does not match output table length {len(sampleDf)}")
 
+    sampleDf[outputColNames] = pd.DataFrame(sampleDf['res'].tolist(), index=sampleDf.index)
+    sampleDf = sampleDf.drop('res', axis=1)
     # save the output to a csv file. 
     # Note that the seq column is removed from the table before saving 
     sampleDf = sampleDf.drop(columns=["seq"])
     
-    saveDfNoNeg(sampleDf, outputColName, outputDir, sampleKey)
+    saveDfNoNeg(sampleDf, outputColNames[0], outputDir, sampleKey)
     return sampleDf
 
 def process_data(df):
     global teloNP
-    df[outputColName] = df.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
+    df[outputColNames[0]] = df.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
     return df
 
 def saveDfNoNeg(df, outputColName, outputDir, sampleKey):
-    dfNoNeg = df[df[outputColName] > 0]
+    dfNoNeg = df[df[outputColName] > 0] # drops row with negative vals (i.e., errors)
     dfNoNeg.reset_index(drop=True, inplace=True)
     # create outdir if it doesn't exist
     if not os.path.exists(outputDir):
         os.makedirs(outputDir)
-    dfNoNeg.to_csv(f"{outputDir}/{sampleKey}.csv")
+    dfNoNeg.to_csv(f"{outputDir}/{sampleKey}.csv", index=False)
 
 # def run_analysis(dataDir, fileMode, teloNP, outputDir, progressLabel, output_frame):
 def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targetQnamesCSV=None):
     global teloNP 
     teloNP = teloNPIn
-    if teloNP:
-        global outputColName
-        outputColName = "teloNPLengths"
+    # commented out
+    # if teloNP:
+    #     global outputColName
+    #     outputColNames[0] = "res"
+    global outputColNames
     vprint(f'Running analysis on {dataDir}')
     # Process the selected file or folder
     vprint(f"Data type: {'File mode' if fileMode else 'Folder mode'}")
@@ -191,7 +180,7 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targ
         qnameTeloValues = []
         #file = os.path.join(root, filename)
         file = filename
-        vprint(file)
+        # vprint(file)
         if filename.endswith("fastq.gz"):
             with gzip.open(file,"rt") as handle:
                 records = SeqIO.parse(handle,"fastq")
@@ -214,6 +203,7 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targ
             continue
 
         qnameTeloValuesDf = pd.DataFrame(qnameTeloValues, columns = ["qname", "seq"])
+        print(qnameTeloValuesDf)
 
         if len(qnameTeloValuesDf) == 0:
             vprint(f"No records in file: {file}")
@@ -221,6 +211,7 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targ
 
         #sampleQnames[sampleKey] = pd.merge(sampleDf, qnameTeloValuesDf, on='qname', how='left')
         sampleQnames[sampleKey] = qnameTeloValuesDf
+        print(qnameTeloValuesDf)
 
         sampleQnames[sampleKey] = process_sampleDf(sampleQnames, sampleKey, outputDir)
 
@@ -236,14 +227,14 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targ
     #         sampleDf = sampleQnames[sampleKey]
             
     #         # Apply the function to each row
-    #         sampleDf[outputColName] = sampleDf.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
+    #         sampleDf[outputColNames[0]] = sampleDf.apply(lambda row: rowToTeloBP(row, teloNP), axis=1)
 
     #         # Note that the seq column is removed from the table before saving 
     #         sampleDf = sampleDf.drop(columns=["seq"])
     #         sampleQnames[sampleKey] = sampleDf
 
     #         # Save the output to a csv file. 
-    #         saveDfNoNeg(sampleDf, outputColName, outputDir, sampleKey)
+    #         saveDfNoNeg(sampleDf, outputColNames[0], outputDir, sampleKey)
     #         nonlocal count
     #         count += 1
     #         # progressLabel.config(text=f"Processing tables... ({count}/{totalFiles})")
@@ -273,14 +264,14 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targ
     for sampleKey in sampleQnames.keys():
         sampleDf = sampleQnames[sampleKey]
         sampleTotalReads = len(sampleDf)
-        sampleNonNegativeReads = len(sampleDf[sampleDf[outputColName] >= 0])
-        sampleInitErrors = len(sampleDf[sampleDf[outputColName] == errorReturns["init"]])
-        sampleFusedReadErrors = len(sampleDf[sampleDf[outputColName] == errorReturns["fusedRead"]])
-        sampleStrandTypeErrors = len(sampleDf[sampleDf[outputColName] == errorReturns["strandType"]])
-        sampleSeqNotFound = len(sampleDf[sampleDf[outputColName] == errorReturns["seqNotFound"]])
+        sampleNonNegativeReads = len(sampleDf[sampleDf[outputColNames[0]] >= 0])
+        sampleInitErrors = len(sampleDf[sampleDf[outputColNames[0]] == errorReturns["init"]])
+        sampleFusedReadErrors = len(sampleDf[sampleDf[outputColNames[0]] == errorReturns["fusedRead"]])
+        sampleStrandTypeErrors = len(sampleDf[sampleDf[outputColNames[0]] == errorReturns["strandType"]])
+        sampleSeqNotFound = len(sampleDf[sampleDf[outputColNames[0]] == errorReturns["seqNotFound"]])
 
         vprint(f"Sample: {sampleKey}")
-        vprint(f"Average teloBP length: {sampleDf[sampleDf[outputColName] >= 0][outputColName].mean()}")
+        vprint(f"Average teloBP length: {sampleDf[sampleDf[outputColNames[0]] >= 0][outputColNames[0]].mean()}")
 
         vprint(f"\nTotal reads (including errors): {sampleTotalReads}")
         vprint(f"Reads without errors: {sampleNonNegativeReads}")
@@ -290,7 +281,7 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targ
         vprint(f"Seq not found errors: {sampleSeqNotFound}")
 
         totalReads += sampleTotalReads
-        totalReadLengths += sampleDf[sampleDf[outputColName] >= 0][outputColName].sum()
+        totalReadLengths += sampleDf[sampleDf[outputColNames[0]] >= 0][outputColNames[0]].sum()
         nonNegativeReads += sampleNonNegativeReads
         initErrors += sampleInitErrors
         fusedReadErrors += sampleFusedReadErrors

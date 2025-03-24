@@ -1,4 +1,6 @@
-
+build/
+test_data/
+test_results/
 *.fna
 *.fai
 *.fasta
@@ -14,3 +16,4 @@ Scripts/Data/*
 .venv/
 .vscode/
 TeloBP.egg-info/*
+TeloBP/__pycache__/

@@ -1,4 +1,6 @@
-
+build/
+test_data/
+test_results/
 *.fna
 *.fai
 *.fasta

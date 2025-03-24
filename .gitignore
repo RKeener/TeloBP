@@ -16,3 +16,4 @@ Scripts/Data/*
 .venv/
 .vscode/
 TeloBP.egg-info/*
+TeloBP/__pycache__/

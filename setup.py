@@ -11,6 +11,7 @@ setup(
         'numpy>=1.26.0',
         'pandas>=2.2.0',
         'pyparsing>=3.1.1',
-        'zipp>=3.16.2'
+        'zipp>=3.16.2',
+        'pandarallel>=1.6.5'
     ],
 )

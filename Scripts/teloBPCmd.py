@@ -211,7 +211,6 @@ def run_analysis(dataDir, fileMode, teloNPIn, outputDir, save_graphs=False, targ
 
         #sampleQnames[sampleKey] = pd.merge(sampleDf, qnameTeloValuesDf, on='qname', how='left')
         sampleQnames[sampleKey] = qnameTeloValuesDf
-        print(qnameTeloValuesDf)
 
         sampleQnames[sampleKey] = process_sampleDf(sampleQnames, sampleKey, outputDir)
 

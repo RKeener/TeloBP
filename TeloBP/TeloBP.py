@@ -357,10 +357,10 @@ def getIsGStrandFromSeq(seq, GStrandPatternIn, CStrandPatternIn, searchStrandRep
             return False
         elif gStrandMatchLengths > cStrandMatchLengths:
             return True
-        return errorReturns['strandType'], None
+        return errorReturns['strandType']
     
     if min(cStrandCount, gStrandCount) > 100 or abs(cStrandCount - gStrandCount) <= 0.6 * min(cStrandCount, gStrandCount) or min(cStrandCount, gStrandCount) >= fusedReadTeloRepeatThreshold:
-        return errorReturns['fusedRead'], None
+        return errorReturns['fusedRead']
 
     if cStrandCount > gStrandCount:
         return False

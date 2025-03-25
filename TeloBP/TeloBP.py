@@ -46,7 +46,7 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
         validate_seq_teloWindow(seq, teloWindow)
     except Warning as w:
         logging.warning(f"Initial validation failed for read, returning {errorReturns['init']}: {w}")
-        return errorReturns['init']
+        return errorReturns['init'], None
 
     if len(compositionGStrand) == 0:
         compositionGStrand = expectedTeloCompositionQ
@@ -60,9 +60,9 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
             # print("Could not determine telomere strand type, returning -1")
             if isGStrand == errorReturns['fusedRead']:
                 logging.warning(f"Warning: fused strand likely, returning {errorReturns['fusedRead']}")
-                return errorReturns['fusedRead']
+                return errorReturns['fusedRead'], None
             logging.warning(f"Warning: could not determine telomere strand type from sequence, returning {errorReturns['strandType']}")
-            return errorReturns['strandType']
+            return errorReturns['strandType'], None
         
     composition = []
     if isGStrand:
@@ -79,7 +79,7 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
         validate_parameters(seq, isGStrand, composition, teloWindow, windowStep, plateauDetectionThreshold, changeThreshold, targetPatternIndex, nucleotideGraphAreaWindowSize, showGraphs)
     except Warning as w:
         logging.warning(f"Initial validation failed for read, returning {errorReturns['init']}: {w}")
-        return errorReturns['init']
+        return errorReturns['init'], None
 
     # Move through the sequence in windows of size teloWindow, and step size windowStep,
     # and calculate the offset of the nucleotide composition from the expected telomere composition
@@ -164,7 +164,7 @@ def getTeloBoundary(seq, isGStrand = None, compositionGStrand=[], compositionCSt
                 areaList, composition[targetPatternIndex][0] + " Area", windowStep, pdfOut=pdf)
             # makeOffsetPlot(ntOffsets, composition,
             #                offsetIndexToBPConstant=windowStep)
-        return errorReturns['init']
+        return errorReturns['init'], None
 
     # Look through areaDiffs to find point where areaDiffs plateau
     for x in range(indexAtThreshold, len(areaDiffs)-1):
